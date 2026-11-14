@@ -664,22 +664,59 @@ class AimTimerTest(_StubbedGameTest):
         self.callbacks[-1]()
 
     def test_normal_gun_aiming_shows_amber_seconds_half_bar_and_percent(self):
-        self.assertIn("color='#FCAF1A'>1.4 s<", self.part('Seconds')['text'])
-        self.assertIn("color='#FCAF1A'>50%<", self.part('Percent')['text'])
+        self.assertIn("size='13' color='#FCAF1A'>1.4 s<", self.part('Seconds')['text'])
+        self.assertEqual(self.part('Seconds')['alpha'], 0.9)
+        self.assertIn("size='12' color='#FCAF1A'>50%<", self.part('Percent')['text'])
+        self.assertEqual(self.part('Percent')['alpha'], 0.7)
         self.assertEqual((self.part('Track')['x'], self.part('Track')['y']), (150, 0))
-        self.assertEqual(self.part('Fill')['height'], 31)
+        self.assertEqual((self.part('Track')['width'], self.part('Track')['height'], self.part('Track')['alpha']),
+                         (10, 64, 0.35))
+        self.assertEqual((self.part('Fill')['width'], self.part('Fill')['height']), (10, 32))
         self.assertEqual(self.part('Fill')['y'], 16)
+        self.assertEqual(self.part('Fill')['alpha'], 0.85)
         self.assertIn('amber.png', self.part('Fill')['image'])
         self.assertFalse(self.visible('Limit'))
         self.assertFalse(self.visible('Locked'))
         self.assertFalse(self.visible('Cooldown'))
 
-    def test_normal_gun_aimed_hides_seconds_and_turns_green(self):
-        self.tick([0.2, 0.2, 0.2, 0.2])
+    def test_bar_has_no_outline(self):
+        aliases = [alias for alias in self.guiflash.components if alias.startswith('maksforgeGunnerHudAim')]
+        self.assertFalse([alias for alias in aliases if 'Outline' in alias])
+        self.assertEqual([alias for alias in aliases if 'light.png' in self.guiflash.components[alias].get('image', '')],
+                         [self.alias('Limit')])
+
+    def test_labels_follow_the_text_size_setting(self):
+        self.mod._timer.settings['fontSize'] = 20
+        self.tick(at=100.1)
+        self.assertIn("size='19'", self.part('Seconds')['text'])
+        self.assertIn("size='18'", self.part('Percent')['text'])
+
+    def test_aiming_up_moves_the_bar_smoothly(self):
+        self.tick([0.25, 0.2, 0.25, 0.2], at=100.1)
+        self.assertEqual(self.part('Fill')['height'], 38)
+        self.assertIn('>50%<', self.part('Percent')['text'])
+        self.tick(at=100.2)
+        self.assertEqual(self.part('Fill')['height'], 43)
+        self.assertIn('>65%<', self.part('Percent')['text'])
+
+    def test_normal_gun_aimed_hides_seconds_turns_green_then_fades(self):
+        self.tick([0.2, 0.2, 0.2, 0.2], at=100.1)
         self.assertFalse(self.visible('Seconds'))
         self.assertIn("color='#C7FE48'>100%<", self.part('Percent')['text'])
-        self.assertEqual(self.part('Fill')['height'], 62)
+        self.assertEqual(self.part('Fill')['height'], 64)
         self.assertIn('green.png', self.part('Fill')['image'])
+        self.assertEqual((self.part('Fill')['alpha'], self.part('Track')['alpha'], self.part('Percent')['alpha']),
+                         (0.9, 0.35, 0.7))
+        self.tick(at=100.4)
+        self.assertEqual(self.part('Fill')['alpha'], 0.9)
+        self.tick(at=100.6)
+        self.assertEqual((self.part('Fill')['alpha'], self.part('Track')['alpha'], self.part('Percent')['alpha']),
+                         (0.625, 0.25, 0.525))
+        self.tick(at=100.8)
+        self.assertEqual((self.part('Fill')['alpha'], self.part('Track')['alpha'], self.part('Percent')['alpha']),
+                         (0.35, 0.15, 0.35))
+        self.assertTrue(self.visible('Percent'))
+        self.assertIn('>100%<', self.part('Percent')['text'])
 
     def test_type_71_counts_down_the_cooldown_then_aims_the_accurate_circle(self):
         type_71_gun = _Obj(shotDispersionAngle=0.24, tags=frozenset(['dualAccuracy']),
@@ -690,9 +727,11 @@ class AimTimerTest(_StubbedGameTest):
         self.tick(at=101.0)
         self.assertIn("color='#A8A8A8'>3.0 s<", self.part('Cooldown')['text'])
         self.assertIn("color='#FCAF1A'>80%<", self.part('Percent')['text'])
-        self.assertEqual(self.part('Limit')['y'], int(round(31 - 62 * 0.6)))
+        self.assertEqual(self.part('Limit')['y'], int(round(32 - 64 * 0.6)))
+        self.assertEqual((self.part('Limit')['width'], self.part('Limit')['height'], self.part('Limit')['alpha']),
+                         (16, 2, 0.5))
         self.assertTrue(self.visible('Locked'))
-        self.assertEqual(self.part('Locked')['height'], 25)
+        self.assertEqual((self.part('Locked')['height'], self.part('Locked')['alpha']), (26, 0.5))
         self.assertIn('grey.png', self.part('Locked')['image'])
 
         self.tick([0.3, 0.24, 0.3, 0.4], at=103.5)
@@ -702,14 +741,17 @@ class AimTimerTest(_StubbedGameTest):
         self.assertIn("color='#C7FE48'>133%<", self.part('Percent')['text'])
         self.assertIn("color='#FCAF1A'>0.4 s<", self.part('Seconds')['text'])
         self.assertIn('green.png', self.part('Fill')['image'])
-        self.assertEqual(self.part('Fill')['height'], 37)
-        self.assertEqual(self.part('Gain')['height'], 13)
+        self.assertEqual(self.part('Fill')['height'], 38)
+        self.assertEqual((self.part('Gain')['height'], self.part('Gain')['alpha']), (13, 0.85))
         self.assertIn('cyan.png', self.part('Gain')['image'])
 
         self.tick([0.24, 0.24, 0.24, 0.4], at=104.0)
         self.assertIn("color='#C7FE48'>167%<", self.part('Percent')['text'])
         self.assertFalse(self.visible('Seconds'))
-        self.assertEqual(self.part('Gain')['height'], 25)
+        self.assertEqual(self.part('Gain')['height'], 26)
+        self.tick(at=104.7)
+        self.assertEqual((self.part('Gain')['alpha'], self.part('Fill')['alpha']), (0.6, 0.35))
+        self.assertIn('>167%<', self.part('Percent')['text'])
 
         self.tick([0.5, 0.4, 0.5, 0.4], at=110.0)
         self.tick(at=111.0)
@@ -746,14 +788,25 @@ class AimTimerTest(_StubbedGameTest):
         self.drag(self.alias('Track'), 120, 0)
         self.crosshair.view_id = 2
         self.crosshair.onCrosshairViewChanged(2)
-        sniper = self.mod._timer.settings['aimTimer']['sniper']
-        self.assertEqual((self.part('Track')['x'], self.part('Track')['y']), (sniper['x'], sniper['y']))
+        self.assertNotIn('sniper', self.mod._timer.settings['aimTimer'])
+        self.assertEqual((self.part('Track')['x'], self.part('Track')['y']), (120, 0))
         self.drag(self.alias('Track'), 300, 90)
+        sniper = self.mod._timer.settings['aimTimer']['sniper']
         self.assertEqual((sniper['x'], sniper['y']), (300, 90))
         self.crosshair.view_id = 1
         self.crosshair.onCrosshairViewChanged(1)
         self.assertEqual((self.part('Track')['x'], self.part('Track')['y']), (120, 0))
         self.assertEqual(self.mod._timer.settings['aimTimer']['x'], 120)
+
+    def test_former_default_view_positions_are_dropped_but_dragged_ones_kept(self):
+        config = sys.modules['gui.mods.gunner_hud.config']
+        settings = self.mod._timer.settings
+        settings['aimTimer']['sniper'] = {'x': 120, 'y': 60}
+        settings['aimTimer']['strategic'] = {'x': 200, 'y': 10}
+        config.save(settings)
+        loaded = config.load()
+        self.assertNotIn('sniper', loaded['aimTimer'])
+        self.assertEqual(loaded['aimTimer']['strategic'], {'x': 200, 'y': 10})
 
     def test_alphabetical_creation_order_stacks_the_fill_above_the_track(self):
         aim_view = sys.modules['gui.mods.gunner_hud.aim_view']
@@ -766,6 +819,17 @@ class AimTimerTest(_StubbedGameTest):
         sys.modules['gui.mods.gunner_hud.config'].save(self.mod._timer.settings)
         self.mod.init()
         self.assertFalse([alias for alias in self.guiflash.components if alias.startswith('maksforgeGunnerHudAim')])
+
+    def test_switching_the_aim_timer_off_and_on_in_battle_starts_the_bar_afresh(self):
+        self.tick([0.2, 0.2, 0.2, 0.2], at=100.1)
+        self.tick(at=101.0)
+        timer = self.mod._timer
+        timer.settings['aimTimer']['enabled'] = False
+        timer.apply_settings()
+        timer.settings['aimTimer']['enabled'] = True
+        timer.apply_settings()
+        self.tick(at=102.0)
+        self.assertEqual(self.part('Fill')['alpha'], 0.9)
 
 
 LINKAGE = 'maksforge.gunner_hud'

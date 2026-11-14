@@ -21,6 +21,7 @@ class GunnerHud(object):
         self._view = None
         self._aim_view = None
         self._cooldown = aim.CooldownTracker()
+        self._aim_smoother = aim.AimSmoother()
         self._last_accurate_mode = None
         self._shell_counts = {}
         self._watched_ammo = None
@@ -47,6 +48,7 @@ class GunnerHud(object):
         wanted = self._settings['aimTimer']['enabled']
         if wanted and self._aim_view is None:
             self._aim_view = AimBarView(self._settings, self._on_moved)
+            self._aim_smoother.reset()
             if self._crosshair is not None:
                 self._on_crosshair_changed()
         elif not wanted and self._aim_view is not None:
@@ -77,6 +79,7 @@ class GunnerHud(object):
     def _on_avatar_ready(self):
         self._factor = 1.0
         self._cooldown.reset()
+        self._aim_smoother.reset()
         self._last_accurate_mode = None
         self._cancel_tick()
         self._follow_crosshair()
@@ -106,9 +109,10 @@ class GunnerHud(object):
             self._view.hide()
         if self._aim_view is not None:
             try:
-                self._aim_view.show(self._aim_status())
+                self._aim_view.show(self._aim_display())
             except Exception:
                 LOG_CURRENT_EXCEPTION()
+                self._aim_smoother.reset()
                 self._aim_view.hide()
 
     def _watch_shots(self):
@@ -202,6 +206,13 @@ class GunnerHud(object):
         if status is None or (self._settings['hideWhenFull'] and status.state == gun_cooling.COLD):
             return None
         return format_cooling(status, self._settings)
+
+    def _aim_display(self):
+        status = self._aim_status()
+        if status is None:
+            self._aim_smoother.reset()
+            return None
+        return self._aim_smoother.update(status, BigWorld.time())
 
     def _aim_status(self):
         player = BigWorld.player()
